@@ -1,0 +1,10 @@
+node_modules
+.next
+out
+build
+coverage
+package-lock.json
+next-env.d.ts
+# Hand-written project docs: keep their formatting as written
+CLAUDE.md
+docs
