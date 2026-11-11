@@ -1,0 +1,29 @@
+services:
+  db:
+    # Pinned to a major version so a "docker compose pull" never jumps to a new major.
+    image: postgres:18
+    container_name: cv-tailor-db
+    restart: unless-stopped
+    # Compose reads these from .env. Postgres uses them only on the FIRST start,
+    # when the data volume is empty.
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      # host:container. 127.0.0.1 keeps the database reachable only from this PC.
+      # Host port 5433 because 5432 is taken by the native Windows PostgreSQL.
+      - "127.0.0.1:5433:5432"
+    volumes:
+      # Named volume: data survives container removal. Postgres 18 images store data
+      # in a version folder under /var/lib/postgresql.
+      - cv_tailor_pgdata:/var/lib/postgresql
+    healthcheck:
+      # $$ stops Compose from substituting; the variable is read inside the container.
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  cv_tailor_pgdata:
