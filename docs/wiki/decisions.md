@@ -19,6 +19,16 @@ Format: decision, why, alternatives considered.
 - Prisma 7 specifics: the connection URL lives in `prisma7.config.ts`, not in the schema; `.env` is not loaded automatically (we use `dotenv`); the client is generated into `generated/prisma` (git-ignored) and needs a driver adapter (`@prisma/adapter-pg` + `pg`).
 - Alternatives: Drizzle (SQL-first, lighter, less tooling for migrations/studio); raw `pg` (no types, more boilerplate).
 
+## Database schema (Task 3): see `database.md` for the full model
+- **uuid ids** (native Postgres `uuid`): not guessable, which matters because ids will appear in URLs for anonymous users. Alternative: `Int autoincrement` (smaller, but enumerable).
+- **Structured data as `Json` (jsonb)**, validated with zod in the app instead of columns: the CV shape changes with the prompts. Alternative: normalised tables (strict, but a migration for every shape change).
+- **Optional `userId` on `Cv` and `JobPost`** (NULL = anonymous): Phase 3 can attach accounts without rewriting tables. `Application` has no `userId`; its owner is its `Cv`'s owner (single source of truth).
+- **Cascade deletes everywhere**: deleting a user removes all their data and leaves no orphans. Alternative: `Restrict` (manual ordered deletes, easier to leave data behind).
+- **Privacy by design**: no original files and no raw CV text are stored; `expiresAt` for anonymous records (cleanup job comes later).
+- **Anonymous records are protected only by their unguessable UUID.** Acceptable for the prototype: no API routes yet, database reachable only from this PC, short-lived data, and no session machinery needed to try the core flow. Limits: anyone who obtains an id can read the record and it cannot be revoked. Alternative to decide in Phase 2, when the API routes exist: an `anonSessionId` column checked against an httpOnly cookie. It is an additive migration, so nothing is lost by waiting. Not added now.
+- **`ExtractionMethod` = `PDF_TEXT`, `PDF_LLM`, `MANUAL`** (no OCR: it would be a feature from a later phase). Native enum: typo-safe; adding a value is a one-line migration.
+- **Default Prisma table names** (`"JobPost"`, no `@@map`): simplest schema to read and explain. Cost: double quotes in psql.
+
 ## Sequential agent work, small verifiable tasks
 - Why: tasks depend on each other; each step must be reviewable and explainable.
 - Parallelism only for independent tasks, one git worktree per agent.

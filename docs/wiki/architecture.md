@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Phase 1, Task 2 (Postgres in Docker + Prisma connection). The Next.js app is still the generated placeholder; the database is reachable but has no tables yet (schema comes in Task 3).
+Status: Phase 1, Task 3 (database schema). The Next.js app is still the generated placeholder; the database has its four tables (`User`, `Cv`, `JobPost`, `Application`), described in `database.md`.
 
 ## Current structure
 
@@ -9,7 +9,8 @@ cv-tailor/
 ├─ .claude/              Claude Code project settings (plugins)
 ├─ docs/wiki/            Project wiki: index, architecture, decisions, changelog
 ├─ prisma/
-│  └─ schema.prisma      Prisma schema: generator + datasource only, NO models yet
+│  ├─ schema.prisma      Prisma schema: 4 models + 2 enums (see database.md)
+│  └─ migrations/        SQL migrations, committed. One folder per migration + migration_lock.toml
 ├─ public/               Static files served as-is at the site root
 ├─ scripts/
 │  └─ db-check.ts        Connects to Postgres through Prisma and runs SELECT 1
@@ -39,7 +40,6 @@ Generated and not committed: `node_modules/`, `.next/`, `next-env.d.ts`, `genera
 | `src/lib/`        | Server logic: PDF text extractors (`src/lib/extractors/`), logger, shared Prisma client, zod schemas | 1     |
 | `src/components/` | Reusable UI components                                                                             | 1     |
 | `src/agents/`     | Orchestrator that calls the Claude API: extract CV JSON, match with job, rewrite JSON              | 2     |
-| `prisma/migrations/` | Created by the first `prisma migrate dev` (Task 3)                                              | 1     |
 
 Rule of thumb: UI lives in `src/components/` and `src/app/`; anything that talks to the database, the filesystem or an external API lives in `src/lib/` or `src/agents/` and runs on the server only.
 
@@ -76,17 +76,21 @@ docker compose logs -f db            # follow logs (Ctrl+C to leave)
 docker compose stop                  # stop, keep data
 docker compose down                  # remove container, KEEP data (volume stays)
 docker compose down -v               # Reset: remove container AND delete all data
-npm run db:generate                  # regenerate generated/prisma (needed after a fresh clone or schema change)
+npm run db:generate                  # regenerate generated/prisma (needed after a fresh clone, a schema change or a migration: Prisma 7 migrate dev does not do it)
+npm run db:migrate -- --name <name>  # create + apply a migration after editing prisma/schema.prisma
+npm run db:studio                    # Prisma Studio in the browser; it prints its URL
 npm run db:check                     # connect through Prisma and run SELECT 1
 docker exec -it cv-tailor-db psql -U cvtailor -d cvtailor   # open psql inside the container
 ```
 
-Reset when `.env` credentials changed: `docker compose down -v` then `docker compose up -d`.
+Reset when `.env` credentials changed: `docker compose down -v`, then `docker compose up -d`, then `npx prisma migrate deploy` (re-creates the tables from the committed migrations) and `npm run db:generate`.
+
+Reset only the data, keeping the same container and credentials: `npx prisma migrate reset` (drops everything and re-applies all migrations; it asks for confirmation).
 
 ### Setting up on a fresh clone
 
 1. Copy `.env.example` to `.env` and replace `change_me` (use the same password in `POSTGRES_PASSWORD` and inside `DATABASE_URL`).
-2. `npm install`, `npm run db:generate`, `docker compose up -d`, `npm run db:check`.
+2. `npm install`, `docker compose up -d`, `npx prisma migrate deploy` (creates the tables), `npm run db:generate`, `npm run db:check`.
 
 ## Data flow (target)
 
@@ -94,6 +98,7 @@ PDF -> text loader -> cleaning -> LLM extracts structured JSON (zod) -> match ag
 
 ## Tooling notes
 
+- `.prettierrc` sets `"endOfLine": "auto"`: with Git's `core.autocrlf=true` on Windows, checked-out files use CRLF, and Prettier's default (LF only) would make `format:check` fail on every file.
 - ESLint (`npm run lint`) finds code problems; Prettier (`npm run format`) only formats. `eslint-config-prettier` turns off ESLint rules that would fight Prettier. `generated/` is ignored by both.
 - `next.config.ts` was generated with `cacheComponents` and `partialPrefetching` enabled (defaults of the current template). Revisit when real pages are built.
 - Prisma is pinned to exactly 7.10.1 (`prisma`, `@prisma/client`, `@prisma/adapter-pg`) so the CLI and client never drift apart.
