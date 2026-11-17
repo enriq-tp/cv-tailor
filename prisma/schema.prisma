@@ -1,7 +1,10 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
+// Prisma schema for CV Tailor. See docs/wiki/database.md for the reasoning.
+//
+// Conventions:
+// - Ids are native Postgres uuid (random, not guessable in URLs).
+// - Every model has createdAt/updatedAt. updatedAt is filled by Prisma, not by a DB trigger.
+// - userId is OPTIONAL: NULL means an anonymous record (no account yet, Phase 1-2).
+// - Deleting a User deletes their Cvs and JobPosts; deleting those deletes their Applications.
 
 generator client {
   provider = "prisma-client"
@@ -10,4 +13,86 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+// How the text of a CV was obtained. Stored as metadata only; no original file or raw text is kept.
+enum ExtractionMethod {
+  PDF_TEXT // text layer read directly from the PDF
+  PDF_LLM // PDF sent to the LLM to read it
+  MANUAL // typed or pasted by the user
+}
+
+// Where an Application is in the user's workflow.
+enum ApplicationStatus {
+  DRAFT // generated, not yet reviewed by the user
+  REVIEWED // the user reviewed the tailored CV
+  DOWNLOADED // the user downloaded the PDF
+}
+
+// Minimal for now. Auth.js tables (Account, Session...) and extra columns come in Phase 3.
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String?  @unique // optional; Postgres allows several NULLs in a unique column
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cvs      Cv[]
+  jobPosts JobPost[]
+}
+
+// The user's base CV, as STRUCTURED data only (no PDF, no raw text).
+model Cv {
+  id               String           @id @default(uuid()) @db.Uuid
+  userId           String?          @db.Uuid
+  data             Json // contact, summary, experience, education, skills... validated with zod in the app
+  extractionMethod ExtractionMethod
+  pageCount        Int?
+  expiresAt        DateTime? // set for anonymous records; a cleanup job (later task) deletes expired rows
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  // Optional relation: Prisma's default would be SetNull, so Cascade is written explicitly.
+  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applications Application[]
+
+  // Postgres does not index foreign keys automatically.
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model JobPost {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String?   @db.Uuid
+  rawText   String // the pasted posting
+  title     String? // NULL until extracted
+  company   String? // NULL until extracted
+  analysis  Json? // structured analysis; NULL until analysed
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applications Application[]
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// One Cv tailored to one JobPost. The owner is the Cv's owner (no userId here on purpose).
+// There is no unique (cvId, jobPostId): the same pair can have several versions.
+model Application {
+  id          String            @id @default(uuid()) @db.Uuid
+  cvId        String            @db.Uuid
+  jobPostId   String            @db.Uuid
+  tailoredCv  Json? // NULL until generated
+  coverLetter String?
+  status      ApplicationStatus @default(DRAFT)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  cv      Cv      @relation(fields: [cvId], references: [id], onDelete: Cascade)
+  jobPost JobPost @relation(fields: [jobPostId], references: [id], onDelete: Cascade)
+
+  @@index([cvId])
+  @@index([jobPostId])
 }
