@@ -85,6 +85,28 @@ test("redacts the fields that store CV and job posting content", () => {
   );
 });
 
+test("redacts extracted PDF pages and pasted text", () => {
+  const { logger, output } = capture();
+
+  // A whole loader result logged by mistake, and the new field names.
+  logger.info(
+    {
+      result: { pages: [{ pageNumber: 1, text: FAKE_CV_TEXT }], pageCount: 1 },
+    },
+    "test pages nested",
+  );
+  logger.info({ pages: [{ text: FAKE_CV_TEXT }] }, "test pages top level");
+  logger.info({ extractedText: FAKE_CV_TEXT }, "test extractedText");
+  logger.info({ job: { pastedText: FAKE_CV_TEXT } }, "test pastedText");
+
+  const out = output();
+  assert.ok(!out.includes(FAKE_CV_TEXT), "extracted or pasted text leaked");
+  assert.ok(
+    out.includes('"pageCount":1'),
+    "non-sensitive fields must still be logged",
+  );
+});
+
 test("redacts authorization and cookie headers", () => {
   const { logger, output } = capture();
 

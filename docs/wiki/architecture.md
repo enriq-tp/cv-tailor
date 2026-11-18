@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Phase 1, Task 4 (logging and health check). The Next.js app is still the generated placeholder page, plus one route: `GET /api/health`. The database has its four tables (`User`, `Cv`, `JobPost`, `Application`), described in `database.md`. Logging and health check: `ops.md`.
+Status: Phase 1, Task 4.5 (PDF loader, text cleaning, zod schemas; no routes use them yet). The Next.js app is still the generated placeholder page, plus one route: `GET /api/health`. The database has its four tables (`User`, `Cv`, `JobPost`, `Application`), described in `database.md`. Logging and health check: `ops.md`.
 
 ## Current structure
 
@@ -21,7 +21,11 @@ cv-tailor/
 │  └─ lib/               Server-only logic
 │     ├─ db.ts           The one shared Prisma client (reused across hot reloads)
 │     ├─ logger.ts       The pino logger with redaction (see ops.md)
-│     └─ logger.test.ts  Privacy test for the logger (npm test)
+│     ├─ logger.test.ts  Privacy test for the logger (npm test)
+│     ├─ result.ts       Result type: { ok: true, value } | { ok: false, error }
+│     ├─ extractors/     pdf-loader.ts (unpdf), clean-pdf-text.ts, test-pdf-builder.ts (test only) + tests
+│     ├─ text/           normalize-text.ts (CV and light job text), validate-job-text.ts + tests
+│     └─ schemas/        cv.ts, job-posting.ts (zod), see schemas.md
 ├─ generated/prisma/     Prisma Client code created by "prisma generate" (git-ignored)
 ├─ docker-compose.yml    Local Postgres container definition
 ├─ prisma7.config.ts     Prisma CLI config: schema path, migrations path, DATABASE_URL
@@ -43,7 +47,6 @@ Generated and not committed: `node_modules/`, `.next/`, `next-env.d.ts`, `genera
 
 | Folder            | Purpose                                                                                            | Phase |
 | ----------------- | -------------------------------------------------------------------------------------------------- | ----- |
-| `src/lib/extractors/` | PDF text loaders (`src/lib/` itself already exists: `db.ts`, `logger.ts`). zod schemas also go in `src/lib/` | 1     |
 | `src/components/` | Reusable UI components                                                                             | 1     |
 | `src/agents/`     | Orchestrator that calls the Claude API: extract CV JSON, match with job, rewrite JSON              | 2     |
 
@@ -123,6 +126,14 @@ Each agent files its own wiki update and a `changelog.md` line at the end of its
 ## Data flow (target)
 
 PDF -> text loader -> cleaning -> LLM extracts structured JSON (zod) -> match against job JSON -> LLM rewrites only the JSON -> fixed PDF template (`@react-pdf/renderer`) -> PDF. See `CLAUDE.md` for the rules around it.
+
+Built in Task 4.5 (no API route or LLM call uses them yet):
+
+- CV: bytes -> `loadPdf` (`src/lib/extractors/pdf-loader.ts`: size, page and time limits, per-page text, `hasExtractableText`) -> `cleanPdfText` (joins hyphenated line breaks, then `normalizeText`) -> (Phase 2) LLM -> `CvSchema`.
+- Job posting: pasted text -> `validateJobText` (control characters removed, light cleaning, 100 to 20 000 characters) -> stored in `JobPost.rawText` -> (Phase 2) LLM -> `JobPostingSchema` -> `JobPost.analysis`.
+- Details, limits and decisions: `schemas.md`, `decisions.md`.
+- **No PDF in the repository.** `*.pdf` and `/fixtures-private/` are git-ignored; test PDFs are built in memory (`test-pdf-builder.ts`).
+- **Deployment:** `unpdf` requires Node >= 24 (its `engines` field). The host must run Node 24 or newer.
 
 ## Tooling notes
 
