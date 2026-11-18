@@ -46,6 +46,10 @@ const SENSITIVE_FIELDS = [
   "cvText",
   "jobText",
   "text",
+  // text extracted from a PDF (the loader result has `pages: [{ text }]`) and pasted job text
+  "pages",
+  "extractedText",
+  "pastedText",
 ];
 
 const REDACT_PATHS = [

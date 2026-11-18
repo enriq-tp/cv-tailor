@@ -43,3 +43,7 @@ next-env.d.ts
 .claude/settings.local.json
 
 /generated/prisma
+
+# real CVs must never be committed; synthetic test PDFs are built in memory, so no PDF belongs in the repo
+/fixtures-private/
+*.pdf

@@ -33,7 +33,7 @@ logger.info({ cvId, sizeBytes, durationMs }, "cv extracted"); // ids, sizes, dur
 
 Three layers protect this, and none of them replaces the first rule (do not pass sensitive data to the logger):
 
-1. **Redaction by field name.** These keys are replaced by `[REDACTED]` at the top level and one and two levels deep (`{ user: { email } }`): `password`, `token`, `secret`, `apiKey`, `authorization`, `cookie`, `DATABASE_URL`, `databaseUrl`, `connectionString`, `email`, `phone`, `rawText`, `data`, `tailoredCv`, `analysis`, `coverLetter`, `cvText`, `jobText`, `text`, plus `set-cookie` headers. The content fields match the columns in `prisma/schema.prisma`. **Limit:** redaction works by name. It cannot find an email inside a sentence, so never build a log message out of user data.
+1. **Redaction by field name.** These keys are replaced by `[REDACTED]` at the top level and one and two levels deep (`{ user: { email } }`): `password`, `token`, `secret`, `apiKey`, `authorization`, `cookie`, `DATABASE_URL`, `databaseUrl`, `connectionString`, `email`, `phone`, `rawText`, `data`, `tailoredCv`, `analysis`, `coverLetter`, `cvText`, `jobText`, `text`, `pages`, `extractedText`, `pastedText`, plus `set-cookie` headers. The content fields match the columns in `prisma/schema.prisma`. **Limit:** redaction works by name. It cannot find an email inside a sentence, so never build a log message out of user data.
 2. **Errors are reduced to their type name.** Any value under the `err` or `error` key (or an `Error` passed as the first argument) is logged as `{"type":"Error"}`: no message, no stack.
 3. **The privacy test** (`npm test`) fails if a fake password, email, CV text, nested field, header secret or error message reaches the output.
 
@@ -54,6 +54,10 @@ The serializer in layer 2 is a safety net for mistakes, not permission to log er
 ### Adding a field to redact
 
 Add its name to `SENSITIVE_FIELDS` in `src/lib/logger.ts`, add a test case in `src/lib/logger.test.ts`, run `npm test`. Do this whenever a new column or request field holds personal data.
+
+### Input loaders
+
+`loadPdf` and `validateJobText` (see `schemas.md`) log only sizes, counts, durations and a category: `{ sizeBytes, pageCount, charCount, hasExtractableText, durationMs }` on success, `{ sizeBytes, errorCategory, durationMs }` (PDF) or `{ charCount, errorCategory }` (job text) on failure. Never the text, the bytes or an error object; errors are classified by `error.name` only. Tests capture the output and check that fake CV and job text never appear.
 
 ## Health check: `GET /api/health`
 
