@@ -29,6 +29,20 @@ Format: decision, why, alternatives considered.
 - **`ExtractionMethod` = `PDF_TEXT`, `PDF_LLM`, `MANUAL`** (no OCR: it would be a feature from a later phase). Native enum: typo-safe; adding a value is a one-line migration.
 - **Default Prisma table names** (`"JobPost"`, no `@@map`): simplest schema to read and explain. Cost: double quotes in psql.
 
+## Logging with pino (Task 4): see `ops.md`
+- Why pino: structured JSON logs, built-in redaction, fast, and Next.js already treats it as an external package (no bundling workaround). Alternatives: `winston` (heavier, slower, no built-in path redaction), `console.log` (unstructured, no levels, no redaction).
+- Redaction by field name (including nested), plus errors reduced to their type name, plus a privacy test. Why layers: a CV is personal data and a single forgotten `logger.info(cv)` must not leak it. Redaction cannot see inside free text, so the rule "log ids, sizes, durations only" stays the first line of defence.
+- Never pass a caught error to the logger: database errors can contain the connection string. Log a safe category instead.
+- `pino-pretty` is a dev-only dependency, used through pino's `transport` only when `NODE_ENV` is `development`. Production and tests print plain JSON.
+- `LOG_LEVEL` env var, default `info`; an invalid value falls back to `info`.
+
+## Health check (Task 4)
+- `GET /api/health` runs `SELECT 1` with a 2 s timeout and answers 200/503 with `status`, `database`, `timestamp`, `durationMs`, and only a safe `error` category (`timeout`, `connection`, `unknown`).
+- `await connection()` plus `Cache-Control: no-store`: with `cacheComponents`, a `GET` route handler can be prerendered at build time. Verified: `next build` lists the route as dynamic and consecutive calls return different timestamps.
+- Success is logged at `debug` (monitors poll it), failure at `error`.
+- Shared Prisma client in `src/lib/db.ts`, cached on `globalThis` in development so hot reload does not open a new connection pool on every edit.
+- Test runner: Node's built-in `node:test` run by `tsx` (already installed). Alternative: Vitest or Jest (more features, a new dependency and config); not needed for one small test file.
+
 ## Sequential agent work, small verifiable tasks
 - Why: tasks depend on each other; each step must be reviewable and explainable.
 - Parallelism only for independent tasks, one git worktree per agent.

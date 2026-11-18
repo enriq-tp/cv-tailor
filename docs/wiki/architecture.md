@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Phase 1, Task 3 (database schema). The Next.js app is still the generated placeholder; the database has its four tables (`User`, `Cv`, `JobPost`, `Application`), described in `database.md`.
+Status: Phase 1, Task 4 (logging and health check). The Next.js app is still the generated placeholder page, plus one route: `GET /api/health`. The database has its four tables (`User`, `Cv`, `JobPost`, `Application`), described in `database.md`. Logging and health check: `ops.md`.
 
 ## Current structure
 
@@ -15,7 +15,12 @@ cv-tailor/
 ├─ scripts/
 │  └─ db-check.ts        Connects to Postgres through Prisma and runs SELECT 1
 ├─ src/
-│  └─ app/               Next.js App Router: routes, layouts, global CSS
+│  ├─ app/               Next.js App Router: routes, layouts, global CSS
+│  │  └─ api/health/     route.ts: GET /api/health (database check, see ops.md)
+│  └─ lib/               Server-only logic
+│     ├─ db.ts           The one shared Prisma client (reused across hot reloads)
+│     ├─ logger.ts       The pino logger with redaction (see ops.md)
+│     └─ logger.test.ts  Privacy test for the logger (npm test)
 ├─ generated/prisma/     Prisma Client code created by "prisma generate" (git-ignored)
 ├─ docker-compose.yml    Local Postgres container definition
 ├─ prisma7.config.ts     Prisma CLI config: schema path, migrations path, DATABASE_URL
@@ -37,7 +42,7 @@ Generated and not committed: `node_modules/`, `.next/`, `next-env.d.ts`, `genera
 
 | Folder            | Purpose                                                                                            | Phase |
 | ----------------- | -------------------------------------------------------------------------------------------------- | ----- |
-| `src/lib/`        | Server logic: PDF text extractors (`src/lib/extractors/`), logger, shared Prisma client, zod schemas | 1     |
+| `src/lib/extractors/` | PDF text loaders (`src/lib/` itself already exists: `db.ts`, `logger.ts`). zod schemas also go in `src/lib/` | 1     |
 | `src/components/` | Reusable UI components                                                                             | 1     |
 | `src/agents/`     | Orchestrator that calls the Claude API: extract CV JSON, match with job, rewrite JSON              | 2     |
 
@@ -80,6 +85,7 @@ npm run db:generate                  # regenerate generated/prisma (needed after
 npm run db:migrate -- --name <name>  # create + apply a migration after editing prisma/schema.prisma
 npm run db:studio                    # Prisma Studio in the browser; it prints its URL
 npm run db:check                     # connect through Prisma and run SELECT 1
+npm test                             # logger privacy tests (node:test, run by tsx)
 docker exec -it cv-tailor-db psql -U cvtailor -d cvtailor   # open psql inside the container
 ```
 
@@ -101,5 +107,8 @@ PDF -> text loader -> cleaning -> LLM extracts structured JSON (zod) -> match ag
 - `.prettierrc` sets `"endOfLine": "auto"`: with Git's `core.autocrlf=true` on Windows, checked-out files use CRLF, and Prettier's default (LF only) would make `format:check` fail on every file.
 - ESLint (`npm run lint`) finds code problems; Prettier (`npm run format`) only formats. `eslint-config-prettier` turns off ESLint rules that would fight Prettier. `generated/` is ignored by both.
 - `next.config.ts` was generated with `cacheComponents` and `partialPrefetching` enabled (defaults of the current template). Revisit when real pages are built.
+- `pino` (dependency) and `pino-pretty` (dev only, readable logs in development) need no `next.config.ts` change: Next.js already lists `pino`, `pino-pretty` and `thread-stream` as external packages (`serverExternalPackages` docs), so they are not bundled. Verified with `next dev` and `next build` + `next start`.
+- `src/lib/db.ts` and `src/lib/logger.ts` are server-only. Never import them from a client component (no `"use client"` file).
+- Test files (`*.test.ts`) live next to the code and are type-checked by `next build` like any other file; they use only `node:test` from Node, so they add no dependency.
 - Prisma is pinned to exactly 7.10.1 (`prisma`, `@prisma/client`, `@prisma/adapter-pg`) so the CLI and client never drift apart.
 - `npm` prints "allow-scripts" warnings for Prisma packages' install scripts. They are not needed for `prisma generate` here; ignore unless generation starts failing.
