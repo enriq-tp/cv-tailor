@@ -6,7 +6,8 @@ Status: Phase 1, Task 4 (logging and health check). The Next.js app is still the
 
 ```
 cv-tailor/
-├─ .claude/              Claude Code project settings (plugins)
+├─ .claude/              Claude Code project settings (plugins) and subagents
+│  └─ agents/            infra-db.md, frontend.md, backend.md, reviewer.md (see "Agents" below)
 ├─ docs/wiki/            Project wiki: index, architecture, decisions, changelog
 ├─ prisma/
 │  ├─ schema.prisma      Prisma schema: 4 models + 2 enums (see database.md)
@@ -97,6 +98,27 @@ Reset only the data, keeping the same container and credentials: `npx prisma mig
 
 1. Copy `.env.example` to `.env` and replace `change_me` (use the same password in `POSTGRES_PASSWORD` and inside `DATABASE_URL`).
 2. `npm install`, `docker compose up -d`, `npx prisma migrate deploy` (creates the tables), `npm run db:generate`, `npm run db:check`.
+
+## Agents (Claude Code subagents)
+
+Four subagents live in `.claude/agents/` (tracked in git, shared with the repo). Each is a Markdown file: a YAML frontmatter (`name`, `description` = when Claude should use it, `tools` = what it may call, `color`) and a body that is its system prompt (owned folders, forbidden folders, the CLAUDE.md rules that matter in its area, and what to update when it finishes). The workflow rules (one branch per task, PRs to `main`, reviewer before merge) are in `CLAUDE.md`.
+
+| Agent      | Owns                                                                                              | Tools                                                    |
+| ---------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `infra-db` | `docker-compose.yml`, `prisma/`, `prisma7.config.ts`, `scripts/`, `src/lib/db.ts`, `src/app/api/health/` | Read, Grep, Glob, Edit, Write, Bash, PowerShell, WebFetch |
+| `frontend` | `src/app/` (not `api/`), `src/components/`, `public/`, later the PDF template                      | Read, Grep, Glob, Edit, Write, Bash, PowerShell          |
+| `backend`  | `src/app/api/` (not `health/`), `src/lib/` (not `db.ts`, `logger.ts`), `src/agents/`               | Read, Grep, Glob, Edit, Write, Bash, PowerShell, WebFetch |
+| `reviewer` | Nothing (read-only review of the branch diff against `main`)                                      | Read, Grep, Glob, Bash (Edit, Write, NotebookEdit, PowerShell removed) |
+
+Shared files (`src/lib/logger.ts`, `src/lib/logger.test.ts`, `package.json`, `package-lock.json`, `.env.example`, `next.config.ts`, `tsconfig.json`, `eslint.config.mjs`, `.prettierrc`) change only when a task requires it. `CLAUDE.md` and `.claude/` are changed by the owner.
+
+**What is enforced and what is not:**
+
+- Enforced by configuration: which tools each agent has (`tools` / `disallowedTools`), and that none can start other subagents (`Agent` is not in any list).
+- Not enforced, only instructions in the prompt: the folder limits of every agent, the phase limits, the privacy rules, "never run destructive commands", and "the reviewer must not change anything through Bash".
+- The Claude Code docs describe path-level limits only through permission rules in settings (`Edit(path)`, which apply to the whole session) or `PreToolUse` hooks. Neither is used yet. See `decisions.md`.
+
+Each agent files its own wiki update and a `changelog.md` line at the end of its task. Tasks run one at a time, so two agents never edit the same wiki page at once.
 
 ## Data flow (target)
 

@@ -40,6 +40,20 @@ Only work on the current phase. Do not add features from later phases.
 - Do not install new dependencies without saying why.
 - Never commit `.env`. Keep `.env.example` up to date.
 
+## Workflow and agents
+
+- One short-lived branch per task (for example `feat/task-5-upload-page`), created from an up-to-date `main`. One task at a time; no parallel branches.
+- Pull requests always target `main`. Never push directly to `main`. The owner commits, pushes and merges; agents never do.
+- Who does what (subagents in `.claude/agents/`; folder limits are instructions, not technical limits):
+  - `infra-db`: Docker, Prisma schema and migrations, `scripts/`, `src/lib/db.ts`, `src/app/api/health/`.
+  - `frontend`: `src/app/` pages and layouts (not `api/`), `src/components/`, `public/`, later the PDF template.
+  - `backend`: the rest of `src/app/api/`, `src/lib/` (except `db.ts` and `logger.ts`), `src/agents/`.
+  - `reviewer`: read-only. Reports findings, never edits.
+- An agent that needs a file outside its area stops and asks instead of editing it.
+- Run the `reviewer` on the branch before merging. Fix its blockers first.
+- Shared files (`logger.ts`, `package.json`, `.env.example`, config files) change only when the task requires it.
+- Agents never run destructive or state-changing commands (`docker compose down -v`, `prisma migrate reset`, `git push --force`, `git reset --hard`, deleting branches) without the owner's explicit permission.
+
 ## Privacy rules (hard rules)
 
 - A CV is personal data. NEVER write CV or job posting content to logs, traces or error reports.
@@ -52,3 +66,4 @@ Only work on the current phase. Do not add features from later phases.
 - Commits: conventional style (`feat:`, `fix:`, `docs:`, `chore:`).
 - Server logic in `src/lib/` and `src/agents/`; UI components in `src/components/`.
 - Validate all API inputs (zod).
+- This Next.js version has breaking changes: before writing Next.js code, read `AGENTS.md` and the guides it points to in `node_modules/next/dist/docs/`.
