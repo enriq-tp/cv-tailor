@@ -24,6 +24,13 @@
   --margin-rule: #e8b4b0; /* notepad left margin rule: decorative */
   --disabled: #d9ded8; /* background of the button while the form is incomplete */
   --drag: #e6ecfb; /* drop zone while a file is dragged over it */
+
+  /* Requirement status (result screen). Always shown with an icon and a word. */
+  --covered: #17622f; /* green text and icon */
+  --covered-bg: #e1f1e4;
+  --partial: #7a4a00; /* amber text and icon */
+  --partial-bg: #fcefd0;
+  --missing-bg: #f9e6e4; /* "missing" uses brick for text and icon */
 }
 
 @theme inline {
@@ -38,6 +45,11 @@
   --color-fold: var(--fold);
   --color-disabled: var(--disabled);
   --color-drag: var(--drag);
+  --color-covered: var(--covered);
+  --color-covered-bg: var(--covered-bg);
+  --color-partial: var(--partial);
+  --color-partial-bg: var(--partial-bg);
+  --color-missing-bg: var(--missing-bg);
   /* The CSS variables below are created by next/font in layout.tsx */
   --font-sans: var(--font-public-sans);
   --font-heading: var(--font-bricolage);
@@ -47,6 +59,49 @@ body {
   background: var(--chalk);
   color: var(--ink);
   font-family: var(--font-public-sans), system-ui, sans-serif;
+}
+
+/*
+  The sticky "demo data" notice on the result screen. It must never hide the element that
+  has keyboard focus (WCAG 2.2 "focus not obscured"): scroll-padding-top tells the browser to
+  leave that much room at the top when it scrolls a focused element into view.
+  On a very short viewport (high zoom on a laptop) a sticky bar would eat too much of the
+  screen, so it scrolls away like normal content and the padding is removed.
+*/
+html {
+  scroll-padding-top: 6rem;
+}
+.demo-notice {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+@media (max-height: 30rem) {
+  html {
+    scroll-padding-top: 0;
+  }
+  .demo-notice {
+    position: static;
+  }
+}
+
+/*
+  Sticky CV preview (wide screens only; the component decides the wide layout).
+  Only when the viewport is at least 40rem tall: below that, the preview is a normal block
+  that scrolls with the page, so a short window or a tall notice (large text zoom) can never
+  cover it. Offsets are rem so they grow with text zoom: top 6rem matches scroll-padding-top
+  (room for the notice), and the box is 9rem shorter than the viewport, but never below 20rem
+  so it cannot collapse.
+*/
+@media (min-height: 40rem) {
+  .cv-preview-sticky {
+    position: sticky;
+    top: 6rem;
+  }
+  .cv-preview-box {
+    max-height: max(20rem, calc(100vh - 9rem));
+    overflow-y: auto;
+  }
 }
 
 /* One visible focus style for everything: a cobalt ring (6.8:1 on chalk, 7.7:1 on paper). */

@@ -75,7 +75,7 @@ Both input functions return `{ ok: true, value }` or `{ ok: false, error: { cate
 | PDF file (CV) | `loadPdf`        | 5 MiB, 10 pages, 10 s, at least 30 non-whitespace characters for `hasExtractableText` | `empty`, `not_a_pdf`, `corrupt`, `encrypted`, `too_large`, `too_many_pages`, `timeout`, `unknown` |
 | Pasted job text | `validateJobText` | 100 to 20 000 characters (code points) after cleaning     | `empty`, `too_short`, `too_long` |
 
-The PDF size and job text length limits are defined in `src/lib/limits.ts` (no imports, so client components can use them) and re-exported by `pdf-loader.ts` and `validate-job-text.ts`.
+The PDF size and job text length limits are defined in `src/lib/limits.ts` (no imports, so client components can use them) and re-exported by `pdf-loader.ts` and `validate-job-text.ts`. The CV text limits shared with the edit form (`CV_SUMMARY_MAX_CHARS` 2000, `CV_ACHIEVEMENT_MAX_CHARS` 600, `CV_SHORT_TEXT_MAX_CHARS` 100) also live there; `schemas/cv.ts` imports them. An edited text is trimmed, and in single-line fields (bullet, skill) line breaks become one space, before it is counted and saved (`normalizeEditedText` in `validate-edit.ts`), so what is counted is what is stored.
 
 Both log only sizes, counts, durations and the category (see `ops.md`).
 

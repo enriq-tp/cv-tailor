@@ -15,15 +15,21 @@
 // - No email format check: extracted data is messy. Validate when a form needs it.
 
 import * as z from "zod";
+import {
+  CV_ACHIEVEMENT_MAX_CHARS,
+  CV_SHORT_TEXT_MAX_CHARS,
+  CV_SUMMARY_MAX_CHARS,
+} from "@/lib/limits";
 
-// Maximum lengths (characters) and item counts.
+// Maximum lengths (characters) and item counts. The three text limits shared with the UI
+// live in limits.ts.
 const NAME_MAX = 200; // person, company, school, job title, location, skill group...
 const URL_MAX = 500;
 const DATE_MAX = 40;
-const SUMMARY_MAX = 2000;
-const ACHIEVEMENT_MAX = 600;
+const SUMMARY_MAX = CV_SUMMARY_MAX_CHARS;
+const ACHIEVEMENT_MAX = CV_ACHIEVEMENT_MAX_CHARS;
 const DESCRIPTION_MAX = 1000;
-const SHORT_MAX = 100; // a single skill, a language level, a link label, a technology
+const SHORT_MAX = CV_SHORT_TEXT_MAX_CHARS; // a single skill, a language level, a link label, a technology
 
 const text = (max: number) => z.string().max(max).nullish();
 

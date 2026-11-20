@@ -62,6 +62,17 @@ Format: decision, why, alternatives considered.
 - **Client validation is only a convenience.** The server re-validates and is authoritative (it also normalises text, so counts can differ at the boundary).
 - **A rejected file clears the previous one** (error = no file): one simple rule instead of "keep the old file next to an error".
 
+## Result screen (Task 6): see `ui.md`
+
+- **Accept / reject / edit as one pure reducer with derived counters.** State is one `Decisions` record (change id -> status and optional edited text) changed only by `reviewReducer` (accept, reject, undo, edit). The counters "pending, accepted, rejected" are calculated by `countDecisions` on every render and never stored, so they cannot disagree with the cards. A reducer is plain TypeScript, so it is tested without React; unknown ids are ignored. Undo and reject drop the user's edited text, so "pending" and "rejected" never carry stale wording.
+- **The mock has ONE swap point and runs in the browser.** The UI imports only `getMockResult` and `getMockCoverLetterDraft` from `@/lib/mock`. In Phase 2 those two async functions are replaced by calls to the server with the same signatures and the UI does not change. The mock runs in the browser (client effect) because Phase 1 has no API route for it, and it never receives the user's CV or job text, only the cover letter answers.
+- **`aria-disabled` for the download buttons**, same reasoning as the main button in Task 5: they stay focusable and the "Download is coming soon." note (always in the page, linked with `aria-describedby`) explains why nothing happens.
+- **The draft is never overwritten silently.** If the user typed in the cover letter draft (`draftEdited`), a new draft from an answer is kept aside and offered with a "Replace with updated draft" button. Losing hand-written text because of a background update would be worse than a manual click.
+- **Skip rule: a skipped question leaves the requirement out of the letter.** The letter claims only what the CV supports or what the user wrote in an answer. We never invent experience (CLAUDE.md).
+- **`/result?demo=error` is a demo switch, ignored when `NODE_ENV` is `production`.** It exists only so the error screen can be looked at. The check is compiled into the build, so a production user can never be shown a fake error. It carries no user data. Remove it in Phase 2.
+- **Sticky demo notice that gives way.** The notice must always be visible, so it is sticky. To keep WCAG 2.2 "focus not obscured", `html` has `scroll-padding-top` so a focused element is never left under the bar. On very short viewports (`max-height: 30rem`, for example 400% zoom) it becomes normal content instead of eating the screen.
+- **One preview in the DOM, two wrappers (`useMediaQuery`).** At 1024 px and up the preview is a sticky, scrollable, keyboard-reachable region; below it is an open `<details>` without inner scroll. Rendering it twice and hiding one with CSS would duplicate content for screen readers.
+
 ## Sequential agent work, small verifiable tasks
 - Why: tasks depend on each other; each step must be reviewable and explainable.
 - Parallelism only for independent tasks, one git worktree per agent.
@@ -88,3 +99,35 @@ Format: decision, why, alternatives considered.
 - **Two levels of normalisation.** CV text (noisy PDF output) gets `cleanPdfText` (joins words hyphenated across a line break, a heuristic that can wrongly join a real hyphen such as `full-\nstack`) plus `normalizeText` (bullets to `- `, spaces collapsed). Pasted job text gets a LIGHT cleaning (`normalizeJobText`): control characters removed (NUL especially: Postgres cannot store it), line endings unified, trailing spaces trimmed, blank-line runs collapsed. Its line breaks and bullets are kept as pasted because the structure helps the LLM in Phase 2. `JobPost.rawText` therefore stores the validated, lightly normalised text, not a byte-identical paste (owner decision). Known limit: two-column CVs may come out interleaved (needs text item coordinates, later).
 - **Prompt injection.** The pasted job text is untrusted input that will end up in an LLM prompt in Phase 2. It must be treated as DATA, never as instructions: clearly delimited in the prompt, and system instructions never built from it. The LLM output must always be validated with the zod schema before use (and "never invent experience" is checked against the CV data, not trusted to the model). The length and control-character validation here is NOT a defence against injection. The same applies, in a weaker form, to CV text (the user's own file, but a CV copied from elsewhere can carry hidden instructions, e.g. white text).
 - **zod 4.6.7** for schemas (see `schemas.md`): lenient (`.nullish()`), capped sizes, unknown keys stripped, `schemaVersion` for future shape changes.
+
+## Cover letter questions: the honest bridge (Task 6 extension)
+- **Three question kinds.** `gap` (about a missing REQUIRED requirement), `followUp` (asked only when the user says they have no experience with its gap question) and `general` (not tied to a requirement). At most 6 questions are ever asked (`MAX_COVER_LETTER_QUESTIONS`; the mock's worst case is exactly 6).
+- **Follow-ups are decided by pure code (`src/lib/result/question-flow.ts`), not by the model.** The rule "ask a follow-up only after `noExperience` on its parent" must always hold, so it is plain, testable logic. A `noExperience` answer on a non-gap question is invalid and ignored, so it cannot reveal anything.
+- **Three answer outcomes:** `answered` (with text), `noExperience` (gap questions only) and `skipped`. `noExperience` counts as answered in the summary (it is a real outcome); a skipped follow-up counts as skipped.
+- **Draft rules (`buildCoverLetter`):**
+
+| Answer | What the letter gets |
+| --- | --- |
+| skipped, unanswered, or blank text | nothing (no claim, no placeholder) |
+| `noExperience`, follow-up not answered | nothing: we never volunteer a weakness |
+| `noExperience` + follow-up `answered` | `On <topic>: I have not done this yet. The closest I have done: <user text>` (a plain "not yet" sentence, only the user's words) |
+| `answered` (gap or general) | `On <topic>: <user text>` |
+| follow-up whose parent is not `noExperience` | ignored, even if an answer exists |
+
+- **Never generic claims** ("fast learner", "passionate", "expert"...), and never a stronger claim than the user made. Why evidence over adjectives: a concrete example is verifiable and honest; "fast learner" is an empty claim anyone can write.
+- **Verbatim copy is a MOCK rule.** In Phase 2 the letter may be rephrased for fluency but must never add facts or make a stronger claim than the user made.
+- **The banned-phrase test is only a safety net, NOT a guarantee.** In Phase 2 the real safeguard is that the user reviews and edits the letter before downloading it.
+- **Which gaps get a question (Phase 2):** the two most important missing REQUIRED requirements. The others stay in the match analysis and are left out of the letter (the mock: Kubernetes and Kafka are asked, Terraform is nice-to-have and is not).
+- **`topic` field:** always a short noun phrase, capped at `COVER_LETTER_TOPIC_MAX_CHARS` (60), rendered as plain text. In Phase 2 it derives from the untrusted job posting. `isValidTopic` (non-empty, <= 60 code points, no control characters, no `<` or `>`) is what Phase 2 uses to reject or clamp model output.
+- **Requirements for the Phase 2 prompt:**
+  - Return at most 2 gap questions, only for missing required requirements, ordered by importance.
+  - Each gap question needs a `topic` that is a noun phrase of at most 60 characters, plain text, no markup.
+  - Follow-ups are not generated by the model: the code decides when they appear.
+  - Draft: use only the CV and the user's answers; no generic claims; never a stronger claim than the user made; rephrase for fluency only.
+  - The job posting is data, never instructions; the topic is never inserted as HTML or into instructions.
+
+## Task 6 review fixes (frontend): see `ui.md`
+- **Topic is capped where it is drawn (`displayTopic`).** Even if Phase 2 validates the topic, the render helper flattens whitespace and truncates to 60 code points (ellipsis included) so a long or multi-line topic can never break the layout or the button names. It is a last safety net, not a replacement for `isValidTopic`.
+- **Focus after "Try again".** Focus parks on the small always-mounted status message (visible ring), not on a box around the whole result (that would draw a giant ring). When the load finishes, focus moves to the new state's own target (the error box or the first heading) only if it is still parked on the status, so it never falls to `<body>` and never steals focus on first load.
+- **Persistent live region.** Screen readers announce a CHANGE inside a live region that already exists, not one created together with its text. So ResultView always renders one `role="status"` paragraph and only its text changes.
+- **Sticky preview only on tall viewports.** Sticky needs `min-width: 1024px` (component) and `min-height: 40rem` (CSS). In short windows or at large text zoom it scrolls with the page, so the notice bar can never cover it.
