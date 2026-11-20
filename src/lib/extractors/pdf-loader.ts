@@ -13,10 +13,12 @@
 import { extractText, getDocumentProxy } from "unpdf";
 import type { Logger } from "pino";
 import { logger as defaultLogger } from "@/lib/logger";
+import { MAX_PDF_BYTES } from "@/lib/limits";
 import type { Result } from "@/lib/result";
 
 // ---- Limits (see decisions.md for the reasons) ---------------------------------------
-export const MAX_PDF_BYTES = 5 * 1024 * 1024; // 5 MiB: far above a normal CV (~100 KB)
+// MAX_PDF_BYTES lives in `@/lib/limits` (client-safe); re-exported for existing imports.
+export { MAX_PDF_BYTES };
 export const MAX_PDF_PAGES = 10; // a CV is 1-2 pages; 10 leaves room for odd layouts
 export const PDF_TIMEOUT_MS = 10_000; // a hostile PDF must not keep a request busy forever
 // A scanned PDF is just pictures: it has no text layer, so extraction returns "" or a few

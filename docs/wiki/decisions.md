@@ -53,6 +53,15 @@ Format: decision, why, alternatives considered.
 - **Destructive commands:** every agent with a shell is told never to run `docker compose down -v`, `prisma migrate reset`, `git push --force`, `git reset --hard` or delete branches without explicit permission, and never to commit or push. This is also an instruction, not enforcement (Prisma itself additionally blocks `migrate reset` when run by an AI agent).
 - **Frontmatter typos are silent:** Claude Code ignores frontmatter fields it does not recognise, so a misspelt `tools` would give the agent every tool. After editing an agent file, check the result.
 
+## Input screen (Task 5): see `ui.md`
+
+- **`aria-disabled` instead of `disabled` on the main button.** A `disabled` button cannot be focused or activated, so it gives no feedback. With `aria-disabled="true"` it stays focusable; activating it shows all errors and moves focus to the first invalid field, and an always-present hint explains what is missing.
+- **Light only; dark mode deferred.** Two palettes double the contrast checking. The template's dark block was removed and `color-scheme: light` set.
+- **Fonts:** Bricolage Grotesque (headings) and Public Sans (body) through `next/font/google`: self-hosted, no new dependency, no request to Google from the browser. Geist was removed (unused).
+- **Limits come from `src/lib/limits.ts`** (no imports), never from `pdf-loader.ts` or `validate-job-text.ts`: those import pino and unpdf, which must not end up in the browser bundle. Checked: no `pino` or `unpdf` in `.next/static`.
+- **Client validation is only a convenience.** The server re-validates and is authoritative (it also normalises text, so counts can differ at the boundary).
+- **A rejected file clears the previous one** (error = no file): one simple rule instead of "keep the old file next to an error".
+
 ## Sequential agent work, small verifiable tasks
 - Why: tasks depend on each other; each step must be reviewable and explainable.
 - Parallelism only for independent tasks, one git worktree per agent.
