@@ -1,26 +1,151 @@
 @import "tailwindcss";
 
+/*
+  Design tokens. Contrast ratios of every pair are measured and listed in docs/wiki/ui.md.
+  Light only: dark mode is deferred (see docs/wiki/ui.md). `color-scheme: light` tells the
+  browser to keep its own controls (scrollbars, form widgets) light as well, even when the
+  operating system is set to dark.
+*/
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+
+  --chalk: #eef1ec; /* page background */
+  --paper: #ffffff; /* the two "sheets" */
+  --ink: #18212b; /* text */
+  --slate: #4d5967; /* secondary text */
+  --cobalt: #1f44c7; /* primary button, focus ring, accent */
+  --cobalt-dark: #183899; /* button hover */
+  --brick: #b3261e; /* errors (always with icon + text) */
+
+  /* Supporting tones for the paper decorations and states */
+  --edge: #6f7b88; /* border of the drop zone (3:1 against chalk and paper) */
+  --fold: #dce2d9; /* folded corner flap */
+  --line: #e4e9e2; /* notepad ruled lines: decorative, deliberately very faint */
+  --margin-rule: #e8b4b0; /* notepad left margin rule: decorative */
+  --disabled: #d9ded8; /* background of the button while the form is incomplete */
+  --drag: #e6ecfb; /* drop zone while a file is dragged over it */
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-chalk: var(--chalk);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-slate: var(--slate);
+  --color-cobalt: var(--cobalt);
+  --color-cobalt-dark: var(--cobalt-dark);
+  --color-brick: var(--brick);
+  --color-edge: var(--edge);
+  --color-fold: var(--fold);
+  --color-disabled: var(--disabled);
+  --color-drag: var(--drag);
+  /* The CSS variables below are created by next/font in layout.tsx */
+  --font-sans: var(--font-public-sans);
+  --font-heading: var(--font-bricolage);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--chalk);
+  color: var(--ink);
+  font-family: var(--font-public-sans), system-ui, sans-serif;
+}
+
+/* One visible focus style for everything: a cobalt ring (6.8:1 on chalk, 7.7:1 on paper). */
+:focus-visible {
+  outline: 3px solid var(--cobalt);
+  outline-offset: 2px;
+}
+
+/* The real file input is visually hidden, so its focus ring is drawn on the sheet instead. */
+.sheet:focus-within {
+  outline: 3px solid var(--cobalt);
+  outline-offset: 2px;
+}
+
+/*
+  The CV sheet: paper with a folded top-right corner. CSS only, no content, hidden from
+  assistive technology (pseudo-elements are not part of the accessibility tree content).
+  ::before paints the page colour over the cut corner, ::after is the folded flap.
+*/
+.sheet {
+  position: relative;
+  background: var(--paper);
+  border: 2px dashed var(--edge);
+  box-shadow: 0 1px 0 var(--edge);
+}
+.sheet[data-filled="true"] {
+  border-style: solid;
+}
+.sheet[data-dragging="true"] {
+  background: var(--drag);
+  border-color: var(--cobalt);
+  border-style: solid;
+}
+.sheet::before,
+.sheet::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 32px;
+  height: 32px;
+  pointer-events: none;
+}
+.sheet::before {
+  background: var(--chalk);
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+.sheet::after {
+  background: var(--fold);
+  clip-path: polygon(0 0, 100% 100%, 0 100%);
+}
+
+/*
+  The job notepad: faint ruled lines and a left margin rule behind the textarea.
+  Line height is 2rem, so the lines match the text rows. `background-attachment: local`
+  makes the lines scroll together with the text.
+*/
+.notepad-field {
+  position: relative;
+}
+.notepad-field::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2.5rem;
+  width: 1px;
+  background: var(--margin-rule);
+  pointer-events: none;
+}
+.notepad-textarea {
+  display: block;
+  width: 100%;
+  min-height: 16rem;
+  padding: 0 1rem 0 3.25rem;
+  line-height: 2rem;
+  background-color: transparent;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(2rem - 1px),
+    var(--line) calc(2rem - 1px),
+    var(--line) 2rem
+  );
+  background-attachment: local;
+  resize: vertical;
+}
+.notepad-textarea::placeholder {
+  color: var(--slate);
+  opacity: 1;
+}
+
+/* No transitions or animations for people who ask the system to reduce motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
 }

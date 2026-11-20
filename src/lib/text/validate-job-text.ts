@@ -15,11 +15,9 @@ import { logger as defaultLogger } from "@/lib/logger";
 import type { Result } from "@/lib/result";
 import { normalizeJobText } from "@/lib/text/normalize-text";
 
-// Below ~100 characters there is nothing to analyse (a title alone is not a posting).
-export const MIN_JOB_TEXT_CHARS = 100;
-// 20 000 characters is about 3 000-4 000 words: longer than any real posting, and it
-// bounds the LLM cost of one request.
-export const MAX_JOB_TEXT_CHARS = 20_000;
+// The limits live in `@/lib/limits` (client-safe); re-exported so existing imports work.
+import { MAX_JOB_TEXT_CHARS, MIN_JOB_TEXT_CHARS } from "@/lib/limits";
+export { MAX_JOB_TEXT_CHARS, MIN_JOB_TEXT_CHARS };
 
 export type JobTextErrorCategory = "empty" | "too_short" | "too_long";
 
@@ -36,7 +34,7 @@ export type ValidateJobTextOptions = {
 };
 
 // C0 control characters except tab (\t), line feed (\n) and carriage return (\r, which
-// normalizeText turns into \n), plus DEL. This includes NUL (U+0000): Postgres text
+// normalizeJobText turns into \n), plus DEL. This includes NUL (U+0000): Postgres text
 // columns cannot store it.
 const CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 

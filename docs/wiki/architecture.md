@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Phase 1, Task 4.5 (PDF loader, text cleaning, zod schemas; no routes use them yet). The Next.js app is still the generated placeholder page, plus one route: `GET /api/health`. The database has its four tables (`User`, `Cv`, `JobPost`, `Application`), described in `database.md`. Logging and health check: `ops.md`.
+Status: Phase 1, Task 4.5 (PDF loader, text cleaning, zod schemas; no routes use them yet). Task 5 added the mocked input screen at `/` and a placeholder `/result` (see `ui.md`); the only API route is `GET /api/health`. The database has its four tables (`User`, `Cv`, `JobPost`, `Application`), described in `database.md`. Logging and health check: `ops.md`.
 
 ## Current structure
 
@@ -17,11 +17,15 @@ cv-tailor/
 │  └─ db-check.ts        Connects to Postgres through Prisma and runs SELECT 1
 ├─ src/
 │  ├─ app/               Next.js App Router: routes, layouts, global CSS
+│  │  ├─ page.tsx        Input screen (Server Component, renders TailorForm)
+│  │  ├─ result/page.tsx Placeholder result page (Task 6 builds the real one)
 │  │  └─ api/health/     route.ts: GET /api/health (database check, see ops.md)
+│  ├─ components/        UI. Client Components: tailor-form, cv-dropzone, job-textarea. Also field-error, form-validation (+ test). See ui.md
 │  └─ lib/               Server-only logic
 │     ├─ db.ts           The one shared Prisma client (reused across hot reloads)
 │     ├─ logger.ts       The pino logger with redaction (see ops.md)
 │     ├─ logger.test.ts  Privacy test for the logger (npm test)
+│     ├─ limits.ts       Input limits (PDF size, job text length); no imports, safe for client components
 │     ├─ result.ts       Result type: { ok: true, value } | { ok: false, error }
 │     ├─ extractors/     pdf-loader.ts (unpdf), clean-pdf-text.ts, test-pdf-builder.ts (test only) + tests
 │     ├─ text/           normalize-text.ts (CV and light job text), validate-job-text.ts + tests
@@ -47,7 +51,6 @@ Generated and not committed: `node_modules/`, `.next/`, `next-env.d.ts`, `genera
 
 | Folder            | Purpose                                                                                            | Phase |
 | ----------------- | -------------------------------------------------------------------------------------------------- | ----- |
-| `src/components/` | Reusable UI components                                                                             | 1     |
 | `src/agents/`     | Orchestrator that calls the Claude API: extract CV JSON, match with job, rewrite JSON              | 2     |
 
 Rule of thumb: UI lives in `src/components/` and `src/app/`; anything that talks to the database, the filesystem or an external API lives in `src/lib/` or `src/agents/` and runs on the server only.

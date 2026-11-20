@@ -75,6 +75,8 @@ Both input functions return `{ ok: true, value }` or `{ ok: false, error: { cate
 | PDF file (CV) | `loadPdf`        | 5 MiB, 10 pages, 10 s, at least 30 non-whitespace characters for `hasExtractableText` | `empty`, `not_a_pdf`, `corrupt`, `encrypted`, `too_large`, `too_many_pages`, `timeout`, `unknown` |
 | Pasted job text | `validateJobText` | 100 to 20 000 characters (code points) after cleaning     | `empty`, `too_short`, `too_long` |
 
+The PDF size and job text length limits are defined in `src/lib/limits.ts` (no imports, so client components can use them) and re-exported by `pdf-loader.ts` and `validate-job-text.ts`.
+
 Both log only sizes, counts, durations and the category (see `ops.md`).
 
 ### What is stored in `JobPost.rawText`
