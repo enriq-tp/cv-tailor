@@ -22,7 +22,8 @@ cv-tailor/
 │  │  │  └─ page.tsx     Server Component: notice, heading, Suspense around ResultView
 │  │  └─ api/health/     route.ts: GET /api/health (database check, see ops.md)
 │  ├─ components/        UI. Client Components: tailor-form, cv-dropzone, job-textarea. Also field-error, form-validation (+ test). See ui.md
-│  │  └─ result/         Result screen: result-view (loads the mock, owns the review state), review-reducer (+ test), change-card, cv-preview, cover-letter-panel (+ question-form, conversation-list), match-analysis, status-badge, download-button, loading/error states, demo-notice, use-media-query, topic-text (`displayTopic`, + test)
+│  │  └─ result/         Result screen: result-view (loads the mock, owns the review state), review-reducer (+ test), change-card, cv-preview, cover-letter-panel (+ question-form, conversation-list), match-analysis, status-badge, download-button, loading/error states, demo-notice, use-media-query, topic-text (`displayTopic`, + test), download-action (Task 6.5)
+│  │  └─ pdf/            Task 6.5: the fixed PDF template (cv-document.tsx, letter-document.tsx, pdf-styles.ts), supported-characters.ts, generate-pdf.ts (+ 3 test files, package.json with "type": "module"). Browser-side, see ui.md
 │  └─ lib/               Server-only logic
 │     ├─ db.ts           The one shared Prisma client (reused across hot reloads)
 │     ├─ logger.ts       The pino logger with redaction (see ops.md)
@@ -148,6 +149,13 @@ Built in Task 4.5 (no API route or LLM call uses them yet):
 - `ResultView` calls `getMockResult` in an effect (with a `cancelled` flag, so React's double effect in development and "Try again" cannot apply a stale result) and gives the data to `ReadyResult`, which owns the review state (`useReducer` with `review-reducer.ts`). `CoverLetterPanel` owns the cover letter state. Everything stays in React state: no URL, storage, cookies, fetch or logs.
 - Client code imports only `@/lib/mock`, `@/lib/result/apply-changes`, `@/lib/result/validate-edit` and `@/lib/limits` (plus `import type`). Never the zod schemas, the PDF loader, the logger or the database (checked in `.next/static`).
 - **Swapping the mock in Phase 2:** the UI depends only on the two async functions exported by `src/lib/mock/index.ts`. Replace their bodies with server calls (the result addressed by an id and stored server-side, so nothing travels in the URL) and delete `?demo=error` in `result-view.tsx`.
+
+## PDF download (Task 6.5)
+
+- **Dependency:** `@react-pdf/renderer` 4.9.0 (exact), the fixed PDF template of the data flow. It is used in the BROWSER: `src/components/pdf/generate-pdf.ts` loads it (and the two document modules) with `await import(...)` only when a Download button is pressed, so it lives in lazy chunks and is not part of the initial JavaScript of `/result`. No API route, no database, no LLM.
+- `download-action.tsx` (result screen) -> `supported-characters.ts` (instant check) -> `generate-pdf.ts` (lazy: `cv-document.tsx` / `letter-document.tsx` + `pdf-styles.ts` + react-pdf) -> `Blob` + page count -> `downloadPdf` (the only `createObjectURL`, revoked after the click).
+- `supported-characters.ts` and `generate-pdf.ts` import only types from `@/lib` (`import type { Cv }`, `Result`). Never the zod schemas, the loader (`unpdf`), the logger or the database in client code. The tests (only) use `renderToBuffer` and `loadPdf`; `pdf-isolation.test.ts` enforces the import rules.
+- Details, states, template sketch and concepts: `ui.md`. Decisions: `decisions.md`.
 
 ## Tooling notes
 
