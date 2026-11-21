@@ -1,4 +1,4 @@
-# UI (Task 5: input screen, Task 6: result screen, both mocked)
+# UI (Task 5: input screen, Task 6: result screen, both mocked; Task 6.5: PDF template and download)
 
 Status: the home page `/` has the input screen (CV drop zone, job posting notepad, "Tailor my CV" button). Nothing is processed: a valid form navigates to `/result`, which shows a SAMPLE result made of invented data (Task 6, see "Result screen" below). The result page does not read anything from the first page, on purpose.
 
@@ -91,7 +91,7 @@ Server vs Client: pages are Server Components (static text, metadata). Only the 
 
 ## Privacy rules for the UI
 
-- The CV file and the pasted text stay in React state only. The file's content is never read (no `FileReader`, `arrayBuffer`, `text()`, `createObjectURL`). Only name and size are shown.
+- The CV file and the pasted text stay in React state only. The file's content is never read (no `FileReader`, `arrayBuffer`, `text()`, `createObjectURL`). Only name and size are shown. (Since Task 6.5 `createObjectURL` has ONE exception: the generated output PDF, in `generate-pdf.ts`. See "PDF template and download".)
 - Nothing goes into the URL or query string, no `localStorage`, `sessionStorage`, IndexedDB or cookies, no `console.*`, no `fetch`.
 
 ## Required notes
@@ -102,7 +102,7 @@ Added in Task 6, all to be reviewed or removed in Phase 2 (search the code for "
 
 - "Sample result: this is demo data, not based on your CV." (`demo-notice.tsx`) and the h1 "Sample result" plus its sub-line "A made-up example of the review screen, so you can try it out." (`app/result/page.tsx`). Remove when the result is real.
 - "Preparing the sample result..." (`loading-state.tsx`) and "The sample result could not be loaded." (`error-state.tsx`), "How the sample CV matches the job" (`match-analysis.tsx`).
-- "Download is coming soon." under "Download CV" and "Download letter" (`download-button.tsx`). Change when downloads exist.
+- ("Download is coming soon." is gone since Task 6.5: the buttons really download. Its replacement phrases are listed under "PDF template and download".)
 - The invented person and company: Sam Placeholder, Sample Systems Ltd, Example Apps Inc, Demo Logistics, Senior Backend Engineer (sample) (all in `src/lib/mock/mock-data.ts`, shown in cards, preview, match list and letter).
 - Cover letter texts, which come from the mock data (Phase 2 replaces it): the three button labels ("Answer", "I don't have this experience", "Skip"), the follow-up and general question texts, the three hint texts, the done messages "All questions answered" / "All questions done. N skipped; the letter leaves them out.", and the mock's letter frames ("On <topic>:", "I have not done this yet. The closest I have done:").
 - The `?demo=error` switch in `result-view.tsx`: MUST be removed in Phase 2. It is already ignored when `NODE_ENV` is `production`.
@@ -151,7 +151,8 @@ src/components/result/
   conversation-list.tsx    read-only list of handled questions, follow-ups nested
   topic-text.ts            pure TS: displayTopic (one line, capped topic for display)
   topic-text.test.ts       node:test for displayTopic
-  download-button.tsx      inert aria-disabled button + "Download is coming soon."
+  download-action.tsx      "use client": a download button with its status/alert messages (Task 6.5; replaced download-button.tsx)
+src/components/pdf/        the fixed PDF template and the download logic (Task 6.5, see "PDF template and download" below)
 ```
 
 ### Review state model
@@ -245,3 +246,149 @@ No browser tool was available, so these were NOT checked in a real browser: visu
 Not verified: layout between 768 and 1024 px with long file names.
 
 No browser tool was available, so the visual result, keyboard flow, drag and drop and reduced motion were not checked in a real browser. Only HTML output, build, lint, tests and contrast numbers were checked. Do this manually (see the task report).
+
+## PDF template and download (Task 6.5)
+
+"Download CV" and "Download letter" on `/result` now build a real PDF in the browser and download it. Nothing is uploaded, no API route is called, nothing is stored or logged. The data is still the invented sample data.
+
+### What gets downloaded
+
+- **CV** (`cv-tailored.pdf`): `applyChanges(originalCv, changes, decisions)`, exactly what the preview shows (accepted and edited changes applied, pending and rejected keep the original text).
+- **Letter** (`cover-letter.pdf`): the CURRENT text of the draft textarea (what the user sees), with the contact data of the sample CV (`data.originalCv.contact`, passed to `CoverLetterPanel` as the `contact` prop; mock only) for the header.
+
+### Files
+
+```
+src/components/pdf/
+  package.json               {"type": "module"}: see "Tests" below (why this file is here)
+  pdf-styles.ts              page size, margins, colours, StyleSheet, hyphenation switched off (react-pdf)
+  cv-document.tsx            CvDocument: the fixed CV template (react-pdf); also ContactHeader and PageCounter
+  letter-document.tsx        LetterDocument: the cover letter, same header and typography
+  supported-characters.ts    pure TS: which characters Helvetica can show, the checks, the message text
+  generate-pdf.ts            the ONLY file that loads react-pdf (lazy) and uses URL.createObjectURL
+  *.test.ts                  supported-characters.test.ts, pdf-render.test.ts, pdf-isolation.test.ts
+src/components/result/download-action.tsx   the button + messages used for both documents
+```
+
+### States of a download button
+
+| State | What the user sees | Notes |
+| --- | --- | --- |
+| idle | the button | |
+| checking | nothing visible | Instant and synchronous: the characters are checked BEFORE react-pdf is loaded. |
+| unsupported characters | `role="alert"` error naming the characters and sections | Nothing is generated or downloaded. |
+| preparing | "Preparing your PDF..." in the polite status line; the button is `aria-disabled` and `aria-busy` | A second click does nothing (a ref stops it, because `aria-disabled` alone does not block clicks). Focus stays on the button. |
+| error | `role="alert"`: "The PDF could not be created. Nothing was downloaded. Try again." | A broken file is never downloaded. The error object is never shown or logged. |
+| long-document warning | status text "This CV is 3 pages long. Most employers expect one or two. Nothing was cut." plus buttons "Download anyway" and "Keep editing" | CV: 3 or more pages. Letter: more than 1 page. Nothing is cut or shrunk. |
+| done | "CV downloaded." / "Letter downloaded." in the status line | |
+
+Messages sit right under the button that caused them. Two live regions per button are ALWAYS in the page and only their content changes (screen readers announce changes in an existing live region, not new elements): `role="status"` (progress, warning, confirmation) and `role="alert"` (errors). The button points at both with `aria-describedby`.
+
+**Focus.** Focus is never moved by force: it stays on the Download button while generating. When the warning appears, its two buttons are the very next tab stops, and the warning text is announced by the status region, so no focus jump (and no trap) is needed. "Download anyway" and "Keep editing" disappear when pressed, so each puts focus back on the Download button (otherwise it would fall to `<body>`).
+
+**Stale results.** The state belongs to one version of the content (`contentKey`: the review decisions for the CV, the draft text for the letter). If the content changes, an old warning or error is hidden, and a file that finishes after a change is dropped without downloading. So "Download anyway" can never download content that no longer matches the screen.
+
+**"Download anyway" reuses the blob** that was already generated; it does not render the PDF again.
+
+### The template
+
+One fixed design, A4, 18 mm margins, Helvetica. Single column.
+
+```
++--------------------------------------------------+
+|  Sam Placeholder                      (20 pt, bold, cobalt)
+|  email | phone | location | links    (one line, only the items that exist)
+|  ----------------------------------   (thin cobalt rule)
+|
+|  Summary                              (12 pt bold, fixed English headings)
+|  Two or three lines of text.
+|
+|  Experience
+|  Backend Engineer, Sample Systems Ltd (bold)
+|  Sampletown | 2021-03 - Present
+|  •  Built a REST API used by three internal teams.
+|  •  Moved the order database to PostgreSQL.
+|
+|  Education     (degree, field / institution | dates)
+|  Skills        (one comma-separated line)
+|  Projects      (name, description, "Technologies: ...", url)
+|  Languages     (English (Native), ...)
++--------------------------------------------------+
+```
+
+- Order: Summary, Experience, Education, Skills, Projects, Languages. A section with no content is left out completely: no heading without content, no label without a value, no empty separators (a missing phone leaves no " |" behind).
+- Dates: "start - end"; "Present" when `isCurrent`. Links are printed as plain text, not as clickable annotations.
+- Page: no images, no tables, no columns, no icons, no page numbers, no header or footer. Colours: name and rule in the app's cobalt, text in the app's ink.
+- Metadata: title "CV" (letter: "Cover letter"), language "en-GB", no author, subject or keywords. (react-pdf itself writes "react-pdf" as producer and creator, and a creation date; nothing personal.)
+- **Section headings are in English on purpose** (the target market is UK jobs), whatever the language of the CV text.
+- **Cover letter:** the same header and fonts, one A4 page. A blank line starts a new paragraph; a single line break inside a paragraph is KEPT as a line break (people type "Kind regards," and the name on the next line). If it is longer than one page it flows to a second page and the screen warns.
+
+### Concept: how react-pdf lays out a page
+
+- A document is made of `<Document>` > `<Page>` > `<View>` and `<Text>`. `<Page>` is a sheet of paper, `<View>` a box (like a `div`), `<Text>` holds text. Text must be inside a `<Text>`.
+- Styles look like CSS but the unit is the POINT (1/72 inch), not the pixel. A4 is 595 x 842 pt, so the 18 mm margins are about 51 pt.
+- Layout is flexbox, and the default direction is a column: boxes stack from top to bottom. A bullet is a row (`flexDirection: "row"`): a narrow column for the "•" and a column with `flex: 1` for the text, so a long bullet wraps under its own text.
+- **Automatic page breaks:** when content does not fit, react-pdf continues on a new page. A box with `wrap={false}` is never split across two pages (we use it only on small blocks: an experience title with its dates and first bullet, an education entry). It must not be put on tall blocks: a block taller than a page cannot be placed, and content can disappear. `minPresenceAhead` on a heading moves it to the next page if less than 40 pt would follow it.
+- A `fixed` element is repeated on every page. Its `render` function receives `{ pageNumber, totalPages }`. We use that to learn the page count (see below).
+
+### Concept: why a fixed template is predictable
+
+The data (a JSON `Cv`) and the layout are separate. The LLM (Phase 2) only changes the data; it never decides fonts, margins or order. So the layout is written, tested and checked ONCE, and every CV goes through the same code: the same headings in the same order, the same fonts, a known length per line. The alternative (a model that writes the layout for each CV) would give a different, unchecked file each time, which can break the reading order for an ATS, overflow the page or use fonts the reader does not have.
+
+### Concept: what makes a CV readable by an ATS
+
+An ATS (applicant tracking system) extracts the text of the PDF and tries to sort it into fields. It helps it when:
+
+- **Real text.** Selectable text, not a picture of text (a scanned or image-based CV has nothing to extract). The template draws only text.
+- **Single column.** Text is read in the order it is drawn. Two columns or a sidebar can be read line by line across both columns and mix up the sections.
+- **Standard fonts.** Helvetica is a standard PDF font, so every reader has it and the characters map to real text.
+- **Standard headings.** "Summary", "Experience", "Education", "Skills" are words an ATS looks for. Creative names ("My journey") are not understood.
+- **No tables, images or icons.** Tables can be read cell by cell in a strange order. Icons (a phone symbol) can come out as odd characters. Text inside images is invisible.
+- **Reading order.** The order in the file is the reading order: name, contact, summary, then each job with its title before its bullets. The tests assert this order on the extracted text.
+- **No headers or footers.** Some systems drop them, and the contact details would be lost.
+
+### Characters: what works and what happens otherwise
+
+The PDF uses Helvetica, a standard PDF font built into every reader (nothing is embedded, so files stay small). Helvetica only has the Western European alphabet. Results from probing react-pdf 4.9.0:
+
+- Works and reads back correctly: printable ASCII; Latin-1 (é ñ ü ç ß å ø æ ...); the Windows-1252 punctuation (– — “ ” ‘ ’ … • € £ and friends). The supported set is U+0020-U+007E, U+00A0-U+00FF and the Windows-1252 extras, MINUS the micro sign (see below). Every one of them is rendered and read back in `pdf-render.test.ts`.
+- **Fails SILENTLY:** Latin Extended (ł ő ř ş ź), Cyrillic, Greek, CJK and emoji. react-pdf shows no warning; it draws a wrong character ("Łódź" came out as "Aódz", "Привет" as "@825B"). A CV with a wrong name is worse than no CV, so the template cannot be trusted to fail by itself.
+- So BEFORE generating, `findUnsupportedCharacters` / `checkCvCharacters` / `checkLetterCharacters` look at every text field (by code point, so an emoji is one character) and the download is blocked with a message that names the section and the characters, for example "These characters can't be shown in the PDF: ł, ź (Summary); Ж (Experience). Remove or replace them to download." At most 10 characters per section are listed ("and N more"). Invisible characters are named by code (U+200B). There is NO automatic replacement (ł to l): it would change a person's name without asking.
+- Found by the round-trip test: the micro sign "µ" (U+00B5) is drawn correctly but extracted as the Greek letter "μ" (U+03BC), so it is NOT in the supported set (the user is asked to replace it).
+- Normalised, not blocked: a non-breaking space (U+00A0) becomes a normal space and a soft hyphen (U+00AD) is removed, because readers do not return them unchanged.
+- Whitespace: line breaks (`\n`, `\r`) and tabs are not reported. In a one-line field (title, bullet, skill...) any run of whitespace becomes one space; in the summary and the letter line breaks are kept and tabs become spaces.
+- Hyphenation is switched off (`Font.registerHyphenationCallback`): by default react-pdf breaks long words ("expi-" / "alidocious"), which cuts one word in two in the extracted text. A word wider than a whole line may still be broken by the layout at the line end; that is a hard limit, not hyphenation.
+
+**KNOWN LIMITATION (dead end).** A person whose name contains an unsupported character (for example "Łukasz") cannot download a PDF: the check blocks it and there is no screen where the name can be edited yet (the review screen only edits the suggested changes). It stays like this until a full CV editing screen exists. **Phase 2 path:** embed a Unicode font such as Noto Sans (SIL Open Font License) with `Font.register`; then the Latin Extended and Cyrillic alphabets work and the check shrinks to "characters the font does not have". CJK and emoji need other fonts.
+
+### The page count
+
+Both documents contain a `fixed` `<Text>` whose `render` receives `totalPages` and calls `onPageCount`. It returns an empty string and is `position: absolute`, so it adds no text and takes no space (a test compares the extracted text with and without it). Why not count `/Type /Page` in the bytes: that is a guess about the file format, it breaks on compressed object streams, and it would count a different thing than the layout did. The test also checks the callback equals the number of pages the loader reads back. If the callback never reports (page count 0), generation is treated as failed (loud failure instead of a hidden warning).
+
+### Lazy loading
+
+`generate-pdf.ts` loads react-pdf and the two document modules with `await import(...)` inside the functions. Next.js (Turbopack) puts a dynamically imported module and its dependencies in their own chunks, fetched when first needed, so the initial JavaScript of `/result` does not carry the PDF library (it is large). `generate-pdf.ts` itself is small and is imported statically. `src/components/result/` never imports react-pdf, the documents or the styles.
+
+### `URL.createObjectURL` exception
+
+The Task 5 rule "never `createObjectURL`" was about the uploaded input file, which is never read, and it stays. The ONE exception is `downloadPdf` in `generate-pdf.ts`: it creates an object URL for the PDF WE generated, clicks a temporary hidden link, and revokes the URL one second later (`revokeObjectURL`). It is not revoked in the same line because `click()` only asks the browser to start the download and some browsers read the address a moment later. A test checks that `createObjectURL` appears in no other file of `src/components/pdf` or `src/components/result`.
+
+### Tests
+
+`npm test` now includes three files in `src/components/pdf/`. They render real PDFs (`renderToBuffer`) and read them back with the project's own loader (`loadPdf`), using invented data only. Because react-pdf and its hyphenation package are ES modules, tsx must load them as ES modules, and tsx follows the nearest `package.json`: that is why `src/components/pdf/package.json` contains `{"type": "module"}` (without it the import fails with "Package subpath './en-us' is not defined by exports"). Test files are `.ts` (no JSX): they call `CvDocument({ ... })` as a function. The component functions use no hooks, so calling them directly is fine.
+
+### Phase 2 review list (new user-facing phrases, Task 6.5)
+
+Review or remove together with the other sample phrases:
+
+- File names: `cv-tailored.pdf`, `cover-letter.pdf`.
+- Progress: "Preparing your PDF..."
+- Confirmations: "CV downloaded.", "Letter downloaded."
+- Error: "The PDF could not be created. Nothing was downloaded. Try again."
+- Unsupported characters: "These characters can't be shown in the PDF: ... Remove or replace them to download." (the section names Contact, Summary, Experience, Education, Skills, Projects, Languages and Cover letter are shown to the user).
+- Long document: "This CV is N pages long. Most employers expect one or two. Nothing was cut." and "This letter is N pages long. A cover letter usually fits on one page. Nothing was cut."; buttons "Download anyway" and "Keep editing".
+- The fixed English section headings in the PDF (deliberate, see `decisions.md`) and the PDF titles "CV" and "Cover letter".
+
+### Not verified in Task 6.5
+
+No browser was used. NOT checked: how the PDF looks in Acrobat, Chrome, Firefox and macOS Preview; the Next.js / Turbopack build of the dynamic imports and that react-pdf stays out of the initial chunks (commands in the task report); the real browser download and the file name; screen reader announcements of the status and alert regions; the visual layout of the buttons and messages (long messages at 360 px, the warning box); keyboard flow and focus return after "Download anyway" / "Keep editing"; text selection and copy in each reader. Checked by tests: text extraction, reading order, empty fields, character round trip, hyphenation, page count, metadata, isolation.

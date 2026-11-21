@@ -4,10 +4,13 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getMockResult } from "@/lib/mock";
 import type { MockResult } from "@/lib/mock";
+import { applyChanges } from "@/lib/result/apply-changes";
+import { CV_FILE_NAME, generateCvPdf } from "../pdf/generate-pdf";
+import { checkCvCharacters } from "../pdf/supported-characters";
 import { ChangeCard } from "./change-card";
 import { CoverLetterPanel } from "./cover-letter-panel";
 import { CvPreview } from "./cv-preview";
-import { DownloadButton } from "./download-button";
+import { DownloadAction } from "./download-action";
 import { ErrorState } from "./error-state";
 import { LoadingState } from "./loading-state";
 import { MatchAnalysis } from "./match-analysis";
@@ -38,6 +41,10 @@ function ReadyResult({ data }: { data: MockResult }) {
   const counts = countDecisions(changes, decisions);
   const summary = `${counts.pending} pending, ${counts.accepted} accepted, ${counts.rejected} rejected`;
 
+  // The CV that gets downloaded is exactly what the preview shows: accepted and edited changes
+  // applied, pending and rejected ones keep the original text.
+  const cvToDownload = applyChanges(data.originalCv, changes, decisions);
+
   function announce(index: number, what: string) {
     setLastEvent(`Change ${index + 1} ${what}.`);
   }
@@ -59,7 +66,18 @@ function ReadyResult({ data }: { data: MockResult }) {
         </p>
         <div className="mt-4 flex flex-wrap items-start justify-between gap-x-8 gap-y-4">
           <p className="text-lg font-medium">{summary}</p>
-          <DownloadButton id="download-cv" label="Download CV" />
+          <DownloadAction
+            id="download-cv"
+            label="Download CV"
+            documentName="CV"
+            doneMessage="CV downloaded."
+            lengthAdvice="Most employers expect one or two."
+            fileName={CV_FILE_NAME}
+            maxPages={2}
+            contentKey={decisions}
+            findUnsupported={() => checkCvCharacters(cvToDownload)}
+            generate={() => generateCvPdf(cvToDownload)}
+          />
         </div>
         {/* Screen reader announcement; the visible counter above is not live. */}
         <p aria-live="polite" className="sr-only">
@@ -104,6 +122,7 @@ function ReadyResult({ data }: { data: MockResult }) {
       </section>
 
       <CoverLetterPanel
+        contact={data.originalCv.contact}
         questions={data.questions}
         initialDraft={data.initialDraft}
       />

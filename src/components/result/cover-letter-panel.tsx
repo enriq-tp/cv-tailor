@@ -6,6 +6,7 @@ import type {
   CoverLetterAnswer,
   CoverLetterAnswers,
   CoverLetterQuestion,
+  MockResult,
 } from "@/lib/mock";
 import {
   getCurrentQuestion,
@@ -13,11 +14,18 @@ import {
   summarizeAnswers,
 } from "@/lib/result/question-flow";
 import { FieldError } from "../field-error";
+import { LETTER_FILE_NAME, generateLetterPdf } from "../pdf/generate-pdf";
+import { checkLetterCharacters } from "../pdf/supported-characters";
 import { ConversationList } from "./conversation-list";
-import { DownloadButton } from "./download-button";
+import { DownloadAction } from "./download-action";
 import { QuestionForm } from "./question-form";
 
-type Props = { questions: CoverLetterQuestion[]; initialDraft: string };
+type Props = {
+  // Name and contact details for the letter header (mock data in Phase 1).
+  contact: MockResult["originalCv"]["contact"];
+  questions: CoverLetterQuestion[];
+  initialDraft: string;
+};
 type DraftStatus = "idle" | "updating" | "updated" | "error";
 
 const BUTTON =
@@ -25,7 +33,7 @@ const BUTTON =
 
 // Privacy: the answers and the draft live only in this component's state. Never logged,
 // never in the URL or in browser storage.
-export function CoverLetterPanel({ questions, initialDraft }: Props) {
+export function CoverLetterPanel({ contact, questions, initialDraft }: Props) {
   const [answers, setAnswers] = useState<CoverLetterAnswers>({});
   const [draft, setDraft] = useState(initialDraft);
   const [draftEdited, setDraftEdited] = useState(false);
@@ -207,7 +215,19 @@ export function CoverLetterPanel({ questions, initialDraft }: Props) {
           )}
 
           <div className="mt-4">
-            <DownloadButton id="download-letter" label="Download letter" />
+            {/* The letter is generated from the CURRENT text of the textarea. */}
+            <DownloadAction
+              id="download-letter"
+              label="Download letter"
+              documentName="letter"
+              doneMessage="Letter downloaded."
+              lengthAdvice="A cover letter usually fits on one page."
+              fileName={LETTER_FILE_NAME}
+              maxPages={1}
+              contentKey={draft}
+              findUnsupported={() => checkLetterCharacters(draft)}
+              generate={() => generateLetterPdf(contact, draft)}
+            />
           </div>
         </div>
       </div>
