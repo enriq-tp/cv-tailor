@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Phase 1, Task 4.5 (PDF loader, text cleaning, zod schemas; no routes use them yet). Task 5 added the mocked input screen at `/` and Task 6 the mocked result screen at `/result` (see `ui.md`); the only API route is `GET /api/health`. The database has its four tables (`User`, `Cv`, `JobPost`, `Application`), described in `database.md`. Logging and health check: `ops.md`.
+Status: Phase 1, Task 4.5 (PDF loader, text cleaning, zod schemas; no routes use them yet). Task 5 added the mocked input screen at `/` and Task 6 the mocked result screen at `/result` (see `ui.md`); the only API route is `GET /api/health`. The database has its four tables (`User`, `Cv`, `JobPost`, `Application`), described in `database.md`. Logging and health check: `ops.md`. Task 6.5 added the PDF template and downloads, and Task 7 closed Phase 1 (CI, Dependabot, line endings, README): see "CI, Dependabot and line endings" below and `phase-1-checklist.md`.
 
 ## Current structure
 
@@ -12,7 +12,7 @@ cv-tailor/
 ├─ prisma/
 │  ├─ schema.prisma      Prisma schema: 4 models + 2 enums (see database.md)
 │  └─ migrations/        SQL migrations, committed. One folder per migration + migration_lock.toml
-├─ public/               Static files served as-is at the site root
+├─ (no public/ folder)   The create-next-app sample SVGs were deleted in Task 7 (nothing referenced them). Create `public/` again when a real static file exists; Next.js serves it at the site root
 ├─ scripts/
 │  └─ db-check.ts        Connects to Postgres through Prisma and runs SELECT 1
 ├─ src/
@@ -47,7 +47,10 @@ cv-tailor/
 ├─ tsconfig.json         TypeScript config, "strict": true, alias @/* -> src/*
 ├─ package.json          Dependencies and scripts
 ├─ .prettierrc           Prettier formatting rules
-└─ .prettierignore       Files Prettier must not touch
+├─ .prettierignore       Files Prettier must not touch
+├─ .gitattributes        Line endings: store and check out LF everywhere; binary files untouched
+├─ .github/              CI workflow (workflows/ci.yml) and Dependabot configuration (dependabot.yml)
+└─ README.md             What the app is, honest status, how to run it, roadmap (images go in docs/images/)
 ```
 
 Generated and not committed: `node_modules/`, `.next/`, `next-env.d.ts`, `generated/prisma/`.
@@ -157,9 +160,17 @@ Built in Task 4.5 (no API route or LLM call uses them yet):
 - `supported-characters.ts` and `generate-pdf.ts` import only types from `@/lib` (`import type { Cv }`, `Result`). Never the zod schemas, the loader (`unpdf`), the logger or the database in client code. The tests (only) use `renderToBuffer` and `loadPdf`; `pdf-isolation.test.ts` enforces the import rules.
 - Details, states, template sketch and concepts: `ui.md`. Decisions: `decisions.md`.
 
+## CI, Dependabot and line endings (Task 7)
+
+**CI** (`.github/workflows/ci.yml`, one job called `verify`) runs on pull requests to `main` and on pushes to `main`. Steps: checkout, Node 24 with the npm cache, `npm ci`, `npm run db:generate`, lint, `format:check`, tests, `build`, and `npm audit --omit=dev --audit-level=high`. It starts from a clean checkout, so it has no `.env`: the job sets a FAKE `DATABASE_URL` (the build imports `src/lib/db.ts`, which throws without it; nothing connects). There is no database in CI because no test needs one. The token can only read the repository, the two actions are pinned to full commit SHAs, and the runner image is `ubuntu-24.04`. Reasons and trade-offs: `decisions.md`.
+
+**Dependabot** (`.github/dependabot.yml`) checks `npm` and `github-actions` weekly. Minor and patch updates of npm packages arrive grouped in one pull request; major updates arrive one by one; major updates of `prisma`, `@prisma/client` and `@prisma/adapter-pg` are ignored until a deliberate decision. Every Dependabot pull request runs CI.
+
+**Line endings.** `.gitattributes` has `* text=auto eol=lf` plus explicit binary types. The repository already stored LF (Git converted on commit because of `core.autocrlf=true`), so adding the file changes no repository content: only the working files on a Windows checkout differ (CRLF on disk until rewritten). If `npm run format:check` fails on CRLF files after pulling this change, run `npm run format`: it rewrites them as LF, and Git sees no change. Prettier does not touch `docs/` or `CLAUDE.md` (see `.prettierignore`), so those may stay CRLF on disk; Git still stores them as LF.
+
 ## Tooling notes
 
-- `.prettierrc` sets `"endOfLine": "auto"`: with Git's `core.autocrlf=true` on Windows, checked-out files use CRLF, and Prettier's default (LF only) would make `format:check` fail on every file.
+- `.prettierrc` sets `"endOfLine": "lf"` (it was `"auto"` until Task 7, when `.gitattributes` made LF the rule everywhere). See "CI, Dependabot and line endings" below for what to run if `format:check` complains about CRLF files on Windows.
 - ESLint (`npm run lint`) finds code problems; Prettier (`npm run format`) only formats. `eslint-config-prettier` turns off ESLint rules that would fight Prettier. `generated/` is ignored by both.
 - `next.config.ts` was generated with `cacheComponents` and `partialPrefetching` enabled (defaults of the current template). Revisit when real pages are built.
 - `pino` (dependency) and `pino-pretty` (dev only, readable logs in development) need no `next.config.ts` change: Next.js already lists `pino`, `pino-pretty` and `thread-stream` as external packages (`serverExternalPackages` docs), so they are not bundled. Verified with `next dev` and `next build` + `next start`.

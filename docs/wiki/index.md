@@ -9,3 +9,4 @@ Read this first. One line per page. Load only what the task needs.
 - `ui.md` - input screen and result screen (mocked), PDF template and download (task 6.5): visual direction, palette with measured contrast, typography, components, state model, sticky notice, accessibility, UI privacy rules, phrases to review in Phase 2. (created in task 5, result screen in task 6, PDF template and download in task 6.5)
 - `ops.md` - logging rules and levels, redaction, `/api/health`, simulating an outage, Sentry/Langfuse later. (created in task 4)
 - `changelog.md` - what changed and when, one line per task. (started)
+- `phase-1-checklist.md` - what was verified in Phase 1 and how, what was NOT verified (first CI run, real browser checks, real CVs), known limitations carried into Phase 2, and what to do by hand. (created in task 7)
