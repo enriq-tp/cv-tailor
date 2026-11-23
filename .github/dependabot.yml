@@ -1,0 +1,42 @@
+# Dependabot opens pull requests when a dependency (or a GitHub Action) has a new version.
+# Every pull request runs the CI workflow, so an update only merges if lint, tests and the
+# build still pass. Why these choices: docs/wiki/decisions.md.
+
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    groups:
+      # One pull request per week for all minor and patch updates, instead of many.
+      # Major updates are not grouped: each one arrives alone, so it can be read on its own.
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # Prisma majors are a deliberate decision (they change the config file, the client and
+      # the driver adapter). The three packages move together, so all three are ignored.
+      - dependency-name: prisma
+        update-types:
+          - version-update:semver-major
+      - dependency-name: "@prisma/client"
+        update-types:
+          - version-update:semver-major
+      - dependency-name: "@prisma/adapter-pg"
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore(ci)

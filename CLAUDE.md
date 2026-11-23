@@ -39,6 +39,7 @@ Only work on the current phase. Do not add features from later phases.
 - After each task: update the relevant wiki page and `docs/wiki/changelog.md`.
 - Do not install new dependencies without saying why.
 - Never commit `.env`. Keep `.env.example` up to date.
+- Write file contents only with the Write or Edit tools. Never build file text inside shell commands (node -e, echo, here-strings): the shell interprets backticks, $ and quotes, and can run commands by accident.
 
 ## Workflow and agents
 

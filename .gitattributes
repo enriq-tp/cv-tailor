@@ -1,0 +1,16 @@
+# Line endings: Git stores LF and checks files out with LF on every system, so a Windows
+# checkout and the Linux CI machine see identical files (and Prettier's "endOfLine": "lf"
+# agrees). Why: docs/wiki/decisions.md.
+* text=auto eol=lf
+
+# Binary files: never touch their bytes (no line-ending conversion, no text diff).
+*.ico binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
