@@ -1,0 +1,80 @@
+# CI (continuous integration): GitHub runs these checks on a clean machine for every pull
+# request to main and for every push to main. If a file is missing from the repository, or
+# the code only works because of something on the developer's PC (like a .env file), the
+# run fails here instead of after the merge.
+#
+# A workflow file says: WHEN to run (on), what the job may do (permissions), WHERE (runs-on)
+# and WHAT (steps). The reasons for each choice are in docs/wiki/decisions.md.
+
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+# Least privilege: the automatic token can only read the repository.
+permissions:
+  contents: read
+
+# A new push to the same pull request makes the previous run pointless, so it is cancelled.
+# Runs on main are never cancelled: every merge keeps its own result.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verify:
+    name: verify
+    # Pinned to a fixed image (ubuntu-latest is moving to 26.04). Revisit after 26.04 is checked.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      # FAKE value, no real secret. `next build` imports src/lib/db.ts, which throws at import
+      # time when DATABASE_URL is missing. Nothing connects to this address during the build.
+      DATABASE_URL: postgresql://ci:ci@localhost:5433/ci
+    steps:
+      # Actions are pinned to a full commit SHA (a tag can be moved); the comment names the
+      # version. Dependabot (github-actions) proposes updates to both.
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The token is not needed after checkout, so it is not left in the git config.
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # Node 24 or higher is required (unpdf declares it in its engines field).
+          node-version: 24
+          # Caches npm's download cache, keyed on package-lock.json.
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate the Prisma client
+        run: npm run db:generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # Fails the run when a production dependency has a known advisory of severity high or
+      # critical. It was warn-only while the Prisma CLI chain carried an unpatched `effect`;
+      # the npm override in package.json fixed that (docs/wiki/decisions.md, "Known issues
+      # and accepted risks"). If a new advisory with no fix blocks unrelated work, make this
+      # step warn-only again with `continue-on-error: true` and record why.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
