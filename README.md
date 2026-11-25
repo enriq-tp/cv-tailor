@@ -171,6 +171,8 @@ Every pull request to `main` runs the same steps as a clean machine: install, ge
 
 1. **Phase 1, prototype (this repository today):** UI with mocked analysis, real PDF template, Docker Postgres, Prisma schema, logging, health check, CI.
 2. **Phase 2, real model:** an orchestrator in `src/agents/` that calls the Claude API from the server, with error reporting (Sentry) and LLM tracing (Langfuse). The CV is uploaded, the result is stored and addressed by an id.
+   - **Three roles:** an extractor (PDF text and job text to the `Cv` and `JobPosting` structures), a comparer (match analysis) and a generator (suggested changes aimed at existing slots of the CV, not a rewritten CV). There is no LLM judge: the user reviews every change on the existing review screen. An optional in-code check can flag facts that are not in the original CV.
+   - **Plan, tasks, evaluation plan and open decisions:** [docs/wiki/phase-2-plan.md](docs/wiki/phase-2-plan.md). Nothing in it is built yet.
    - **2.5, encoder matching:** a Python FastAPI microservice with a sentence-embedding model to match CV achievements to job requirements, compared against the LLM-only approach on a small evaluation set.
 3. **Phase 3, accounts:** Auth.js, per-user CVs and applications, metrics with Prometheus and Grafana.
 4. **Phase 4, fine-tuning:** an idea, not planned in detail yet.

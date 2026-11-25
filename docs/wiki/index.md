@@ -10,3 +10,4 @@ Read this first. One line per page. Load only what the task needs.
 - `ops.md` - logging rules and levels, redaction, `/api/health`, simulating an outage, Sentry/Langfuse later. (created in task 4)
 - `changelog.md` - what changed and when, one line per task. (started)
 - `phase-1-checklist.md` - what was verified in Phase 1 and how, what was NOT verified (first CI run, real browser checks, real CVs), known limitations carried into Phase 2, and what to do by hand. (created in task 7)
+- `phase-2-plan.md` - Phase 2 plan (not built yet): three-role pipeline (extractor, comparer, generator) with no LLM judge, contract of each role, optional in-code check of invented facts, tasks 8 to 18, evaluation plan, ideas not planned, open decisions (models and budget, long CVs, PDF reading, retention, cover letter). (created 2026-11-25)
